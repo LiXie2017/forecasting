@@ -1,0 +1,95 @@
+---
+title: "Final Project"
+author: "s3637387, Rupesh Papneja"
+date: "2 September 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Loading required libraries
+
+```{r echo=TRUE, include=TRUE, message=FALSE, warning=FALSE}
+library(easypackages)
+libs <- c("forecast","expsmooth","TSA","knitr","tseries", "gglot2", "readxl",
+            "dynlm","Hmisc","car","AER", "magrittr","tseries",
+            "stats", "x12")
+libraries(libs)
+
+```
+## Defining the class objects and method to process each row
+
+```{r}
+
+setClass(Class="TClass",
+         representation(
+           type="character",
+           id="numeric",
+           n="numeric", 
+           forcast_period="numeric",
+           category="character",
+           start_year="numeric",
+           start_frequency="numeric",
+           ts_complete="ts",
+           ts_training="ts"
+          )
+)
+
+processDataRow <- function(x, series_frequency, type) {
+  
+  id <- as.integer(x[1])
+  n <- as.integer(x[2])
+  forcast_period <- as.integer(x[3])
+  category <- (x[4])
+  start_year <- as.integer(x[5])
+  start_frequency <- as.integer(x[6])
+  start_n <- 7
+  
+  vec <- as.vector(x[seq(from = start_n, to = n + start_n - 1)])
+  vec_2 <- as.vector(x[seq(from = start_n, to = n + start_n - forcast_period - 1)]) # change formula for training set if required
+  
+  ts_complete <- ts(vec,start = c(start_year,start_frequency),frequency=series_frequency)
+  ts_training <- ts(vec_2,start = c(start_year,start_frequency),frequency=series_frequency)
+  
+  return (new("TClass",type=type,id=id, n=n, forcast_period=forcast_period,category=category,start_year=start_year,start_frequency=start_frequency, ts_complete=ts_complete, ts_training=ts_training))
+}
+
+getType <- function(sheetNumber) {
+ if (sheetNumber == 1) "Y"
+ else if (sheetNumber == 2) "Q"
+ else if (sheetNumber == 3) "M"
+}
+
+```
+
+## Reading all data and processing it to create time series objects and output list of class objects containing details
+
+```{r}
+all_objects <- list()
+for(i in c(1,2,3)) {
+  df <- read_excel(path = "./data/M3c_reduced.xlsx" , sheet = 1, trim_ws = TRUE)
+  output <- apply(df,1,processDataRow,1,getType(i))
+  all_objects <- append(all_objects,output)
+  rm(df)
+  rm(output)
+}
+```
+
+## To access an individual object from the list
+
+```{r}
+all_objects[[1]] # gives first object in the list
+all_objects[[102]] # gives first quarterly object in the list
+all_objects[[203]] # gives first month object in the list
+```
+```{r}
+all_objects[[1]]@ts_complete # gives first object in the list
+all_objects[[102]]@ts_complete # gives first quarterly object in the list
+all_objects[[203]]@ts_complete # gives first month object in the list
+```
+
+
+
