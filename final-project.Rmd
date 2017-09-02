@@ -34,6 +34,7 @@ setClass(Class="TClass",
            category="character",
            start_year="numeric",
            start_frequency="numeric",
+           superposition="numeric",
            ts_complete="ts",
            ts_training="ts"
           )
@@ -49,9 +50,15 @@ processDataRow <- function(x, series_frequency, type) {
   start_frequency <- as.integer(x[6])
   start_n <- 7
   
-  vec <- as.vector(x[seq(from = start_n, to = n + start_n - 1)])
-  vec_2 <- as.vector(x[seq(from = start_n, to = n + start_n - forecast_period - 1)]) # change formula for training set if required
+  vec <- as.vector(as.numeric(x[seq(from = start_n, to = n + start_n - 1)]))
   
+  #checking for minimum value and calculating value that is to be added to time series object when negative.
+  
+  min_x <- min(vec)
+  superposition <- ifelse(min_x > 0,0,(min_x * -1 + 0.1))
+
+  vec_2 <- as.vector(as.numeric(x[seq(from = start_n, to = n + start_n - forecast_period - 1)])) # change formula for training set if required
+
   ts_complete <- ts(vec,start = c(start_year,start_frequency),frequency=series_frequency)
   ts_training <- ts(vec_2,start = c(start_year,start_frequency),frequency=series_frequency)
   
@@ -63,6 +70,7 @@ processDataRow <- function(x, series_frequency, type) {
               category=category,
               start_year=start_year,
               start_frequency=start_frequency,
+              superposition=superposition,
               ts_complete=ts_complete,
               ts_training=ts_training)
           )
