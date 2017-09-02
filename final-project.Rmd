@@ -83,6 +83,7 @@ for(i in c(1,2,3)) {
   rm(df)
   rm(output)
 }
+rm(i)
 ```
 
 ## To access an individual object from the list
