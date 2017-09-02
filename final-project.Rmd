@@ -30,7 +30,7 @@ setClass(Class="TClass",
            frequency="numeric",
            id="numeric",
            n="numeric", 
-           forcast_period="numeric",
+           forecast_period="numeric",
            category="character",
            start_year="numeric",
            start_frequency="numeric",
@@ -43,19 +43,29 @@ processDataRow <- function(x, series_frequency, type) {
   
   id <- as.integer(x[1])
   n <- as.integer(x[2])
-  forcast_period <- as.integer(x[3])
-  category <- (x[4])
+  forecast_period <- as.integer(x[3])
+  category <- x[4]
   start_year <- as.integer(x[5])
   start_frequency <- as.integer(x[6])
   start_n <- 7
   
   vec <- as.vector(x[seq(from = start_n, to = n + start_n - 1)])
-  vec_2 <- as.vector(x[seq(from = start_n, to = n + start_n - forcast_period - 1)]) # change formula for training set if required
+  vec_2 <- as.vector(x[seq(from = start_n, to = n + start_n - forecast_period - 1)]) # change formula for training set if required
   
   ts_complete <- ts(vec,start = c(start_year,start_frequency),frequency=series_frequency)
   ts_training <- ts(vec_2,start = c(start_year,start_frequency),frequency=series_frequency)
   
-  return (new("TClass",type=type,frequency=series_frequency,id=id, n=n, forcast_period=forcast_period,category=category,start_year=start_year,start_frequency=start_frequency, ts_complete=ts_complete, ts_training=ts_training))
+  return (new("TClass",type=type,
+              frequency=series_frequency,
+              id=id,
+              n=n,
+              forecast_period=forecast_period,
+              category=category,
+              start_year=start_year,
+              start_frequency=start_frequency,
+              ts_complete=ts_complete,
+              ts_training=ts_training)
+          )
 }
 
 getType <- function(sheetNumber) {
