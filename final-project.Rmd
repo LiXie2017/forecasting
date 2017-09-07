@@ -95,7 +95,7 @@ getFrequency <- function(sheetNumber) {
 ```{r}
 all_objects <- list()
 for(i in c(1,2,3)) {
-  df <- read_excel(path = "./data/M3c_reduced.xlsx" , sheet = i, trim_ws = TRUE)
+  df <- read_excel(path = "./data/M3C_reduced.xlsx" , sheet = i, trim_ws = TRUE)
   output <- apply(df,1,processDataRow,getFrequency(i),getType(i))
   all_objects <- append(all_objects,output)
   rm(df)
