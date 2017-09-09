@@ -85,7 +85,7 @@ processDataRow <- function(x, series_frequency, type) {
               original_data=vec,
               validation=vec_3,
               ts_complete=ts_complete,
-              ts_training=ts_training)
+              ts_training=ts_training,
   )
 }
 
@@ -313,7 +313,59 @@ all_objects[[203]] # gives first month object in the list
 all_objects[[1]]@ts_complete # gives first object in the list
 all_objects[[102]]@ts_complete # gives first quarterly object in the list
 all_objects[[203]]@ts_complete # gives first month object in the list
+
 ```
+
+## make each ts non-negative & apply box cox transformation
+```{r}
+for(obj in all_objects) {
+  print(obj@id)
+  tsobject  <- obj@ts_complete
+  
+  if (sum(tsobject <0) > 0) 
+	{ 
+		ts_positive <- tsobject + abs(min(tsobject)) + 0.01
+		positive_adjustment <- abs(min(tsobject)) + 0.01
+	}	else {
+		ts_positive <- tsobject 
+	}
+  
+  
+	# Need to capture the positive modification here
+
+	# Apply box cox transformation to ts_positive
+	lambda = BoxCox.lambda(ts_positive, method = "loglik")
+	ts_bc = BoxCox(ts_positive, lambda = lambda)
+	# list[ts_bc] <- ts_bc
+}
+
+```
+
+# stationarise each ts
+``` {r}
+differencing_order = 0
+for ts_bc_index in list
+{
+		ts_bc <- list[ts_postive_index]
+		stationary <- 0
+		adf <- adf.test(ts_positive)
+
+		if adf$p.value < 0.05 {
+			differencing_order <- 0
+			} 
+			else 
+			{  
+			while adf$p.value > 0.05 
+				{
+					diffferentcing_order = differencing_order + 1
+					ts <- diff(ts, differences = differencing_order)
+					adf <- adf.test(ts)
+					}
+	stationary_ts <- diff(ts, differences = differencing_order)
+}
+```
+
+
 
 ```{r}
 tryCatch(
