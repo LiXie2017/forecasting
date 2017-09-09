@@ -108,17 +108,137 @@ getMethodName <- function(m) {
 }
 
 getAutoModels <- function(tsobject) {
+  lst <- list()
   ics <- c("bic", "aicc", "aic")
   dampeds <- c(TRUE, FALSE)
   xg <- expand.grid(ics,dampeds)
-  lst <- list()
   for(i in 1:6){
     fit.auto <- ets(tsobject,model="ZZZ", damped = xg[i,2], ic=toString(xg[i,1]))
     k <- ifelse(xg[i,2],paste(toString(xg[i,1]),"damped", sep='_'),toString(xg[i,1]))
     lst[[k]] <- accuracy(fit.auto)[6]
+    rm(k)
     rm(fit.auto)
   }
   rm(i)
+  rm(ics)
+  rm(dampeds)
+  rm(xg)
+  return (lst)
+}
+
+getSesModels <- function(tsobject, forecasting_period) {
+  lst <- list()
+  initials <- c("simple", "optimal")
+  exponentials <- c(TRUE, FALSE)
+  dampeds <- c(TRUE, FALSE)
+  xg <- expand.grid(initials,dampeds,exponentials)
+  for(i in 1:8){
+    k <- paste('ses',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
+    tryCatch({
+      fit.ses <- ses(tsobject,initial=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
+      lst[[k]] <- accuracy(fit.ses)[6]
+      rm(fit.ses)
+    },error=function(e){
+      print(paste(k,e,sep=":"))
+    })
+    rm(k)
+  }
+  rm(i)
+  rm(initials)
+  rm(dampeds)
+  rm(exponentials)
+  rm(xg)
+  return (lst)
+}
+
+getHoltModels <- function(tsobject, forecasting_period){
+  lst <- list()
+  initials <- c("simple", "optimal")
+  exponentials <- c(TRUE, FALSE)
+  dampeds <- c(TRUE, FALSE)
+  xg <- expand.grid(initials,dampeds,exponentials)
+  for(i in 1:8){
+    k <- paste('holt',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
+    tryCatch({
+      fit.holt <- holt(tsobject, initial=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
+      lst[[k]] <- accuracy(fit.holt)[6]
+      rm(fit.holt)
+    },error=function(e){
+      print(paste(k,e,sep=":"))
+    })
+    rm(k)
+  }
+  rm(i)
+  rm(initials)
+  rm(dampeds)
+  rm(exponentials)
+  rm(xg)
+  return (lst)
+}
+
+getHoltWintersModels <- function(tsobject, forecasting_period){
+  lst <- list()
+  seasonals <- c("additive", "optimal")
+  exponentials <- c(TRUE, FALSE)
+  dampeds <- c(TRUE, FALSE)
+  xg <- expand.grid(seasonals,dampeds,exponentials)
+  for(i in 1:8){
+    k <- paste('hw',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
+    tryCatch({
+      fit.hw <- hw(tsobject,seasonal=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
+      lst[[k]] <- accuracy(fit.hw)[6]
+      rm(fit.hw)
+    },error=function(e){
+      print(paste(k,e,sep=":"))
+    })
+    rm(k)
+  }
+  rm(i)
+  rm(seasonals)
+  rm(dampeds)
+  rm(exponentials)
+  rm(xg)
+  return (lst)
+}
+
+getEtsModels <- function(tsobject){
+  lst <- list()
+  e <- c("A","M","N")
+  t <- c("A","M","N")
+  s <- c("A","M","N")
+  dampeds <- c(TRUE, FALSE)
+  xg <- expand.grid(e,t,s,dampeds)
+  for(i in 1:54){
+    mt <- toString(paste(xg[i,1],xg[i,2],xg[i,3],sep = ""))
+    k <- paste('ets',mt,ifelse(xg[i,4],'d',''),sep='')
+    tryCatch({
+      if(mt == "NNN") {
+        fit.ets <- ets(tsobject, damped = xg[i,4])
+        lst[[k]] <- accuracy(fit.ets)[6]
+        rm(fit.ets)
+      } else if(xg[i,3] != "N") {
+        if(frequency(tsobject) != 1) {
+          fit.ets <- ets(tsobject, model=mt, damped=xg[i,4])
+          lst[[k]] <- accuracy(fit.ets)[6]
+          rm(fit.ets)
+        }
+      } else {
+        fit.ets <- ets(tsobject, model=mt, damped=xg[i,4])
+        lst[[k]] <- accuracy(fit.ets)[6]
+        rm(fit.ets)
+      }
+    },error=function(e){
+      print(paste(k,e,sep=":"))
+    })
+    rm(k)
+    rm(mt)
+  }
+  rm(i)
+  rm(e)
+  rm(t)
+  rm(s)
+  rm(dampeds)
+  rm(xg)
   return (lst)
 }
 
@@ -129,162 +249,14 @@ getAutoModels <- function(tsobject) {
 ```{r}
 getAllModelsMase <- function(tsobject, forecasting_period) {
   maselst <- list()
-  tryCatch({
-    fit1.ses = ses(tsobject, initial="simple", h=forecasting_period)
-    maselst[["ses_s"]] <- accuracy(fit1.ses)[6]
-  },error=function(e){
-    print(e)
-  })
-  tryCatch({
-    fit2.ses = ses(tsobject, initial="simple", exponential=TRUE, h=forecasting_period)
-    maselst[["ses_s_x"]] <- accuracy(fit2.ses)[6]
-  },error=function(e){
-    print(e)
-  })
-  tryCatch({
-    fit3.ses = ses(tsobject, initial="simple", damped=TRUE, h=forecasting_period)
-    maselst[["ses_s_d"]] <- accuracy(fit3.ses)[6]
-  },error=function(e){
-    print(e)
-  })
-  tryCatch({
-    fit4.ses = ses(tsobject, initial="simple", damped=TRUE, exponential=TRUE, h=forecasting_period)
-    maselst[["ses_s_x_d"]] <- accuracy(fit4.ses)[6]
-  },error=function(e){
-    print(e)
-  })
-  tryCatch({fit5.ses = ses(tsobject, initial="optimal", h=forecasting_period) },error=function(e){
-    print('fit5.ses')
-    print(e)
-  })
-  tryCatch({fit6.ses = ses(tsobject, initial="optimal", damped=TRUE, h=forecasting_period) },error=function(e){
-    print('fit6.ses')
-    print(e)
-  })
-  tryCatch({fit7.ses = ses(tsobject, initial="optimal", exponential=TRUE, h=forecasting_period)},error=function(e){
-    print('fit7.ses')
-    print(e)
-  })
-  tryCatch({fit8.ses = ses(tsobject, initial="optimal", damped=TRUE, exponential=TRUE, h=forecasting_period)},error=function(e){
-    print('fit8.ses')
-    print(e)
-  })
-  tryCatch({fit9.holt = holt(tsobject, initial="simple", h=forecasting_period)},error=function(e){
-    print('fit9.holt')
-    print(e)
-  })
-  tryCatch({fit10.holt = holt(tsobject, initial="optimal", h=forecasting_period) },error=function(e){
-    print('fit10.holt')
-    print(e)
-  })
-  tryCatch({fit11.holt = holt(tsobject, initial="optimal", damped=TRUE, h=forecasting_period)},error=function(e){
-    print('fit11.holt')
-    print(e)
-  })
-  tryCatch({fit12.holt = holt(tsobject, initial="simple", exponential=TRUE, h=forecasting_period)},error=function(e){
-    print('fit12.holt')
-    print(e)
-  })
-  tryCatch({fit13.holt = holt(tsobject, initial="optimal", exponential=TRUE, h=forecasting_period)},error=function(e){
-    print('fit13.holt')
-    print(e)
-  })
-  tryCatch({fit14.holt = holt(tsobject, initial="optimal", exponential=TRUE, damped=TRUE, h=forecasting_period)},error=function(e){
-    print('fit14.holt')
-    print(e)
-  })
+  maselst <- append(maselst,getAutoModels(tsobject))
+  maselst <- append(maselst,getSesModels(tsobject, forecasting_period))
+  maselst <- append(maselst,getHoltModels(tsobject, forecasting_period))
   if(frequency(tsobject) != 1) {
-    tryCatch({fit15.hw = hw(tsobject,seasonal="additive", h=forecasting_period*frequency(tsobject))},error=function(e){
-      print('fit15.hw')
-      print(e)
-    })
-    tryCatch({fit16.hw = hw(tsobject,seasonal="additive",damped = TRUE, h=forecasting_period*frequency(tsobject))},error=function(e){
-      print('fit16.hw')
-      print(e)
-    })
-    tryCatch({fit17.hw = hw(tsobject,seasonal="multiplicative", h=forecasting_period*frequency(tsobject))},error=function(e){
-      print('fit17.hw')
-      print(e)
-    })
-    tryCatch({fit18.hw = hw(tsobject,seasonal="multiplicative",damped = TRUE, h=forecasting_period*frequency(tsobject))},error=function(e){
-      print('fit18.hw')
-      print(e)
-    })
-    tryCatch({fit19.hw = hw(tsobject,seasonal="multiplicative",exponential = TRUE, h=forecasting_period*frequency(tsobject))},error=function(e){
-      print('fit19.hw')
-      print(e)
-    })
-    tryCatch({fit20.hw = hw(tsobject,seasonal="multiplicative",exponential = TRUE, damped=TRUE, h=forecasting_period*frequency(tsobject))},error=function(e){
-      print('fit20.hw')
-      print(e)
-    })
+    maselst <- append(maselst,getHoltWintersModels(tsobject, forecasting_period))
   }
-  tryCatch({fit1.ets = ets(tsobject)},error=function(e){
-    print('fit1.ets')
-    print(e)
-  })
-  tryCatch({fit2.ets = ets(tsobject, model="ANN")},error=function(e){
-    print('fit2.ets')
-    print(e)
-  })
-  tryCatch({fit3.ets = ets(tsobject, model="AAN")},error=function(e){
-    print('fit3.ets')
-    print(e)
-  })
-  tryCatch({fit4.ets = ets(tsobject, model="AAN", damped = TRUE)},error=function(e){
-    print('fit4.ets')
-    print(e)
-  })
-  tryCatch({fit5.ets = ets(tsobject, model="MNN")},error=function(e){
-    print('fit5.ets')
-    print(e)
-  })
-  tryCatch({fit6.ets = ets(tsobject, model="MMN")},error=function(e){
-    print('fit6.ets')
-    print(e)
-  })
-  tryCatch({fit7.ets = ets(tsobject, model="MMN", damped = TRUE)},error=function(e){
-    print('fit7.ets')
-    print(e)
-  })
-  tryCatch({fit8.ets = ets(tsobject, model="MAN")},error=function(e){
-    print('fit8.ets')
-    print(e)
-  })
-  if(frequency(tsobject) != 1){
-    tryCatch({fit9.ets = ets(tsobject, model="AAA")},error=function(e){
-      print('fit9.ets')
-      print(e)
-    })
-    tryCatch({fit10.ets = ets(tsobject, model="AAA", damped = TRUE)},error=function(e){
-      print('fit10.ets')
-      print(e)
-    })
-    tryCatch({fit11.ets = ets(tsobject, model="ANA")},error=function(e){
-      print('fit11.ets')
-      print(e)
-    })
-    tryCatch({fit12.ets = ets(tsobject, model="MMM")},error=function(e){
-      print('fit12.ets')
-      print(e)
-    })
-    tryCatch({fit13.ets = ets(tsobject, model="MMM", damped = TRUE)},error=function(e){
-      print('fit13.ets')
-      print(e)
-    })
-    tryCatch({fit14.ets = ets(tsobject, model="MAA")},error=function(e){
-      print('fit14.ets')
-      print(e)
-    })
-    tryCatch({fit15.ets = ets(tsobject, model="MAA", damped = TRUE)},error=function(e){
-      print('fit15.ets')
-      print(e)
-    })
-    tryCatch({fit16.ets = ets(tsobject, model="MAM")},error=function(e){
-      print('fit16.ets')
-      print(e)
-    })
-  }
+  maselst <- append(maselst,getEtsModels(tsobject))
+  return (maselst)
 }
 ```
 
@@ -293,7 +265,7 @@ getAllModelsMase <- function(tsobject, forecasting_period) {
 ```{r}
 all_objects <- list()
 for(i in c(1,2,3)) {
-  df <- read_excel(path = "./data/M3C_reduced.xlsx" , sheet = i, trim_ws = TRUE)
+  df <- read_excel(path="./data/M3C_reduced.xlsx" , sheet=i, trim_ws=TRUE)
   output <- apply(df,1,processDataRow,getFrequency(i),getType(i))
   all_objects <- append(all_objects,output)
   rm(df)
@@ -302,243 +274,17 @@ for(i in c(1,2,3)) {
 rm(i)
 ```
 
-## To access an individual object from the list
 
-```{r}
-all_objects[[1]] # gives first object in the list
-all_objects[[102]] # gives first quarterly object in the list
-all_objects[[203]] # gives first month object in the list
-```
-```{r}
-all_objects[[1]]@ts_complete # gives first object in the list
-all_objects[[102]]@ts_complete # gives first quarterly object in the list
-all_objects[[203]]@ts_complete # gives first month object in the list
-```
-
-```{r}
-tryCatch(
-  {
-    fit1.ses = ses(all_objects[[1]]@ts_training, initial="simple", h=all_objects[[1]]@forecast_period) 
-    fc <- forecast(fit1.ses)
-    vec <- as.vector(fc$mean[seq(from = 1, to = all_objects[[1]]@diff_n)])
-    acc <- accuracy(fit1.ses)
-    summary(fit1.ses)
-    
-    fit1.ets = ets(all_objects[[1]]@ts_training)
-    fc <- forecast(fit1.ets, h=all_objects[[1]]@diff_n)
-    acc <- accuracy(fit1.ets)
-    summary(fit1.ets)
-    acc[6]
-  },error=function(e){
-    print('fit1.ses')
-    print(e)
-  })
-```
-
-
-```{r}
-for(obj in all_objects) {
-  print(obj@id)
-  tsobject  <- obj@ts_complete
-  f <- obj@frequency
-  tryCatch({fit1.ses = ses(tsobject, initial="simple", h=obj@diff_n) },error=function(e){
-    print('fit1.ses')
-    print(e)
-  })
-  tryCatch({fit2.ses = ses(tsobject, initial="simple", exponential=TRUE, h=obj@diff_n) },error=function(e){
-    print('fit2.ses')
-    print(e)
-  })
-  tryCatch({fit3.ses = ses(tsobject, initial="simple", damped=TRUE, h=obj@diff_n) },error=function(e){
-    print('fit3.ses')
-    print(e)
-  })
-  tryCatch({fit4.ses = ses(tsobject, initial="simple", damped=TRUE, exponential=TRUE, h=obj@diff_n)},error=function(e){
-    print('fit4.ses')
-    print(e)
-  })
-  tryCatch({fit5.ses = ses(tsobject, initial="optimal", h=obj@diff_n) },error=function(e){
-    print('fit5.ses')
-    print(e)
-  })
-  tryCatch({fit6.ses = ses(tsobject, initial="optimal", damped=TRUE, h=obj@diff_n) },error=function(e){
-    print('fit6.ses')
-    print(e)
-  })
-  tryCatch({fit7.ses = ses(tsobject, initial="optimal", exponential=TRUE, h=obj@diff_n)},error=function(e){
-    print('fit7.ses')
-    print(e)
-  })
-  tryCatch({fit8.ses = ses(tsobject, initial="optimal", damped=TRUE, exponential=TRUE, h=obj@diff_n)},error=function(e){
-    print('fit8.ses')
-    print(e)
-  })
-  tryCatch({fit9.holt = holt(tsobject, initial="simple", h=obj@diff_n)},error=function(e){
-    print('fit9.holt')
-    print(e)
-  })
-  tryCatch({fit10.holt = holt(tsobject, initial="optimal", h=obj@diff_n) },error=function(e){
-    print('fit10.holt')
-    print(e)
-  })
-  tryCatch({fit11.holt = holt(tsobject, initial="optimal", damped=TRUE, h=obj@diff_n)},error=function(e){
-    print('fit11.holt')
-    print(e)
-  })
-  tryCatch({fit12.holt = holt(tsobject, initial="simple", exponential=TRUE, h=obj@diff_n)},error=function(e){
-    print('fit12.holt')
-    print(e)
-  })
-  tryCatch({fit13.holt = holt(tsobject, initial="optimal", exponential=TRUE, h=obj@diff_n)},error=function(e){
-    print('fit13.holt')
-    print(e)
-  })
-  tryCatch({fit14.holt = holt(tsobject, initial="optimal", exponential=TRUE, damped=TRUE, h=obj@diff_n)},error=function(e){
-    print('fit14.holt')
-    print(e)
-  })
-  if(f!=1) {
-    tryCatch({fit15.hw = hw(tsobject,seasonal="additive", h=obj@diff_n*frequency(tsobject))},error=function(e){
-      print('fit15.hw')
-      print(e)
-    })
-    tryCatch({fit16.hw = hw(tsobject,seasonal="additive",damped = TRUE, h=obj@diff_n*frequency(tsobject))},error=function(e){
-      print('fit16.hw')
-      print(e)
-    })
-    tryCatch({fit17.hw = hw(tsobject,seasonal="multiplicative", h=obj@diff_n*frequency(tsobject))},error=function(e){
-      print('fit17.hw')
-      print(e)
-    })
-    tryCatch({fit18.hw = hw(tsobject,seasonal="multiplicative",damped = TRUE, h=obj@diff_n*frequency(tsobject))},error=function(e){
-      print('fit18.hw')
-      print(e)
-    })
-    tryCatch({fit19.hw = hw(tsobject,seasonal="multiplicative",exponential = TRUE, h=obj@diff_n*frequency(tsobject))},error=function(e){
-      print('fit19.hw')
-      print(e)
-    })
-    tryCatch({fit20.hw = hw(tsobject,seasonal="multiplicative",exponential = TRUE, damped=TRUE, h=obj@diff_n*frequency(tsobject))},error=function(e){
-      print('fit20.hw')
-      print(e)
-    })
-  }
-  tryCatch({fit1.ets = ets(tsobject)},error=function(e){
-    print('fit1.ets')
-    print(e)
-  })
-  tryCatch({fit2.ets = ets(tsobject, model="ANN")},error=function(e){
-    print('fit2.ets')
-    print(e)
-  })
-  tryCatch({fit3.ets = ets(tsobject, model="AAN")},error=function(e){
-    print('fit3.ets')
-    print(e)
-  })
-  tryCatch({fit4.ets = ets(tsobject, model="AAN", damped = TRUE)},error=function(e){
-    print('fit4.ets')
-    print(e)
-  })
-  tryCatch({fit5.ets = ets(tsobject, model="MNN")},error=function(e){
-    print('fit5.ets')
-    print(e)
-  })
-  tryCatch({fit6.ets = ets(tsobject, model="MMN")},error=function(e){
-    print('fit6.ets')
-    print(e)
-  })
-  tryCatch({fit7.ets = ets(tsobject, model="MMN", damped = TRUE)},error=function(e){
-    print('fit7.ets')
-    print(e)
-  })
-  tryCatch({fit8.ets = ets(tsobject, model="MAN")},error=function(e){
-    print('fit8.ets')
-    print(e)
-  })
-  if(f != 1){
-    tryCatch({fit9.ets = ets(tsobject, model="AAA")},error=function(e){
-      print('fit9.ets')
-      print(e)
-    })
-    tryCatch({fit10.ets = ets(tsobject, model="AAA", damped = TRUE)},error=function(e){
-      print('fit10.ets')
-      print(e)
-    })
-    tryCatch({fit11.ets = ets(tsobject, model="ANA")},error=function(e){
-      print('fit11.ets')
-      print(e)
-    })
-    tryCatch({fit12.ets = ets(tsobject, model="MMM")},error=function(e){
-      print('fit12.ets')
-      print(e)
-    })
-    tryCatch({fit13.ets = ets(tsobject, model="MMM", damped = TRUE)},error=function(e){
-      print('fit13.ets')
-      print(e)
-    })
-    tryCatch({fit14.ets = ets(tsobject, model="MAA")},error=function(e){
-      print('fit14.ets')
-      print(e)
-    })
-    tryCatch({fit15.ets = ets(tsobject, model="MAA", damped = TRUE)},error=function(e){
-      print('fit15.ets')
-      print(e)
-    })
-    tryCatch({fit16.ets = ets(tsobject, model="MAM")},error=function(e){
-      print('fit16.ets')
-      print(e)
-    })
-  }
-}
-rm(tsobject)
-rm(f)
-rm(fit1.ses)
-rm(fit2.ses)
-rm(fit3.ses)
-rm(fit4.ses)
-rm(fit5.ses)
-rm(fit6.ses)
-rm(fit7.ses)
-rm(fit8.ses)
-rm(fit9.holt)
-rm(fit10.holt)
-rm(fit11.holt)
-rm(fit12.holt)
-rm(fit13.holt)
-rm(fit14.holt)
-rm(fit15.hw)
-rm(fit16.hw)
-rm(fit17.hw)
-rm(fit18.hw)
-rm(fit19.hw)
-rm(fit20.hw)
-rm(fit1.ets)
-rm(fit2.ets)
-rm(fit3.ets)
-rm(fit4.ets)
-rm(fit5.ets)
-rm(fit6.ets)
-rm(fit7.ets)
-rm(fit8.ets)
-rm(fit9.ets)
-rm(fit10.ets)
-rm(fit11.ets)
-rm(fit12.ets)
-rm(fit13.ets)
-rm(fit14.ets)
-rm(fit15.ets)
-rm(fit16.ets)
-```
-
-
-```{r}
+```{r echo=FALSE, include=FALSE, message=FALSE, warning=FALSE}
 modelsSpecs <- list()
-for(i in 1:3) {
-  obj <- all_objects[[i]]
-  modelsSpecs[[all_objects[[i]]@id]] <- getAutoModels(obj@ts_training) 
+for(il in 1:length(all_objects)) {
+  element <- all_objects[[il]]
+  print(all_objects[[il]]@id)
+  modelsSpecs[[all_objects[[il]]@id]] <- getAllModelsMase(element@ts_training, element@forecast_period) 
 }
-rm(i)
-rm(obj)
+rm(il)
+rm(element)
 ```
+
 
 
