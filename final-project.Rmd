@@ -43,6 +43,16 @@ setClass(Class="TClass",
          )
 )
 
+setClass(Class="RClass",
+         representation(
+           key="character",
+           mase="numeric",
+           aic="numeric",
+           bic="numeric", 
+           aicc="numeric"
+         )
+)
+
 processDataRow <- function(x, series_frequency, type) {
   
   id <- as.integer(x[1])
@@ -115,7 +125,11 @@ getAutoModels <- function(tsobject) {
   for(i in 1:6){
     fit.auto <- ets(tsobject,model="ZZZ", damped = xg[i,2], ic=toString(xg[i,1]))
     k <- ifelse(xg[i,2],paste(toString(xg[i,1]),"damped", sep='_'),toString(xg[i,1]))
-    lst[[k]] <- accuracy(fit.auto)[6]
+    lst[[k]] <- new("RClass",key=k,
+              mase=accuracy(fit.auto)[6],
+              aic=fit.auto$aic,
+              bic=fit.auto$bic,
+              aicc=fit.auto$aicc)
     rm(k)
     rm(fit.auto)
   }
@@ -136,7 +150,11 @@ getSesModels <- function(tsobject, forecasting_period) {
     k <- paste('ses',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
     tryCatch({
       fit.ses <- ses(tsobject,initial=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
-      lst[[k]] <- accuracy(fit.ses)[6]
+      lst[[k]] <- new("RClass",key=k,
+              mase=accuracy(fit.ses)[6],
+              aic=ifelse(is.null(fit.ses$model$aic),-1,fit.ses$model$aic),
+              bic=ifelse(is.null(fit.ses$model$bic),-1,fit.ses$model$bic),
+              aicc=ifelse(is.null(fit.ses$model$aicc),-1,fit.ses$model$aicc))
       rm(fit.ses)
     },error=function(e){
       print(paste(k,e,sep=":"))
@@ -161,7 +179,11 @@ getHoltModels <- function(tsobject, forecasting_period){
     k <- paste('holt',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
     tryCatch({
       fit.holt <- holt(tsobject, initial=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
-      lst[[k]] <- accuracy(fit.holt)[6]
+      lst[[k]] <- new("RClass",key=k,
+              mase=accuracy(fit.holt)[6],
+              aic=ifelse(is.null(fit.holt$model$aic),-1,fit.holt$model$aic),
+              bic=ifelse(is.null(fit.holt$model$bic),-1,fit.holt$model$bic),
+              aicc=ifelse(is.null(fit.holt$model$aicc),-1,fit.holt$model$aicc))
       rm(fit.holt)
     },error=function(e){
       print(paste(k,e,sep=":"))
@@ -178,7 +200,7 @@ getHoltModels <- function(tsobject, forecasting_period){
 
 getHoltWintersModels <- function(tsobject, forecasting_period){
   lst <- list()
-  seasonals <- c("additive", "optimal")
+  seasonals <- c("additive", "multiplicative")
   exponentials <- c(TRUE, FALSE)
   dampeds <- c(TRUE, FALSE)
   xg <- expand.grid(seasonals,dampeds,exponentials)
@@ -186,7 +208,11 @@ getHoltWintersModels <- function(tsobject, forecasting_period){
     k <- paste('hw',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
     tryCatch({
       fit.hw <- hw(tsobject,seasonal=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
-      lst[[k]] <- accuracy(fit.hw)[6]
+      lst[[k]] <- new("RClass",key=k,
+              mase=accuracy(fit.hw)[6],
+              aic=ifelse(is.null(fit.hw$model$aic),-1,fit.hw$model$aic),
+              bic=ifelse(is.null(fit.hw$model$bic),-1,fit.hw$model$bic),
+              aicc=ifelse(is.null(fit.hw$model$aicc),-1,fit.hw$model$aicc))
       rm(fit.hw)
     },error=function(e){
       print(paste(k,e,sep=":"))
@@ -214,17 +240,29 @@ getEtsModels <- function(tsobject){
     tryCatch({
       if(mt == "NNN") {
         fit.ets <- ets(tsobject, damped = xg[i,4])
-        lst[[k]] <- accuracy(fit.ets)[6]
+        lst[[k]] <- new("RClass",key=k,
+              mase=accuracy(fit.ets)[6],
+              aic=fit.ets$aic,
+              bic=fit.ets$bic,
+              aicc=fit.ets$aicc)
         rm(fit.ets)
       } else if(xg[i,3] != "N") {
         if(frequency(tsobject) != 1) {
           fit.ets <- ets(tsobject, model=mt, damped=xg[i,4])
-          lst[[k]] <- accuracy(fit.ets)[6]
+          lst[[k]] <- new("RClass",key=k,
+              mase=accuracy(fit.ets)[6],
+              aic=fit.ets$aic,
+              bic=fit.ets$bic,
+              aicc=fit.ets$aicc)
           rm(fit.ets)
         }
       } else {
         fit.ets <- ets(tsobject, model=mt, damped=xg[i,4])
-        lst[[k]] <- accuracy(fit.ets)[6]
+        lst[[k]] <- new("RClass",key=k,
+              mase=accuracy(fit.ets)[6],
+              aic=fit.ets$aic,
+              bic=fit.ets$bic,
+              aicc=fit.ets$aicc)
         rm(fit.ets)
       }
     },error=function(e){
