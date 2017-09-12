@@ -14,9 +14,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r echo=TRUE, include=TRUE, message=FALSE, warning=FALSE}
 library(easypackages)
-libs <- c("forecast","expsmooth","TSA","knitr","tseries", "gglot2", "readxl",
-          "dynlm","Hmisc","car","AER", "magrittr","tseries", "dLagM",
-          "stats", "x12")
+libs <- c("forecast","expsmooth","TSA","knitr","gglot2", "readxl","dplyr","plyr",
+          "dynlm","Hmisc","car","AER", "magrittr","tseries", "dLagM","stats", "x12")
 libraries(libs)
 
 ```
@@ -42,6 +41,7 @@ setClass(Class="TClass",
            ts_training="ts"
          )
 )
+
 
 processDataRow <- function(x, series_frequency, type) {
   
@@ -112,17 +112,14 @@ getAutoModels <- function(tsobject) {
   ics <- c("bic", "aicc", "aic")
   dampeds <- c(TRUE, FALSE)
   xg <- expand.grid(ics,dampeds)
-  for(i in 1:6){
-    fit.auto <- ets(tsobject,model="ZZZ", damped = xg[i,2], ic=toString(xg[i,1]))
+  for(i in 1:nrow(xg)){
+    fit.auto <- ets(tsobject,model="ZZZ", damped = xg[i,2], ic=toString(xg[i,1]),opt.crit = "amse")
     k <- ifelse(xg[i,2],paste(toString(xg[i,1]),"damped", sep='_'),toString(xg[i,1]))
     lst[[k]] <- accuracy(fit.auto)[6]
     rm(k)
     rm(fit.auto)
   }
-  rm(i)
-  rm(ics)
-  rm(dampeds)
-  rm(xg)
+  rm(i,ics,dampeds,xg)
   return (lst)
 }
 
@@ -132,7 +129,7 @@ getSesModels <- function(tsobject, forecasting_period) {
   exponentials <- c(TRUE, FALSE)
   dampeds <- c(TRUE, FALSE)
   xg <- expand.grid(initials,dampeds,exponentials)
-  for(i in 1:8){
+  for(i in 1:nrow(xg)){
     k <- paste('ses',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
     tryCatch({
       fit.ses <- ses(tsobject,initial=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
@@ -143,11 +140,7 @@ getSesModels <- function(tsobject, forecasting_period) {
     })
     rm(k)
   }
-  rm(i)
-  rm(initials)
-  rm(dampeds)
-  rm(exponentials)
-  rm(xg)
+  rm(i,initials,dampeds,exponentials,xg)
   return (lst)
 }
 
@@ -157,7 +150,7 @@ getHoltModels <- function(tsobject, forecasting_period){
   exponentials <- c(TRUE, FALSE)
   dampeds <- c(TRUE, FALSE)
   xg <- expand.grid(initials,dampeds,exponentials)
-  for(i in 1:8){
+  for(i in 1:nrow(xg)){
     k <- paste('holt',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
     tryCatch({
       fit.holt <- holt(tsobject, initial=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
@@ -168,21 +161,17 @@ getHoltModels <- function(tsobject, forecasting_period){
     })
     rm(k)
   }
-  rm(i)
-  rm(initials)
-  rm(dampeds)
-  rm(exponentials)
-  rm(xg)
+  rm(i,initials,dampeds,exponentials,xg)
   return (lst)
 }
 
 getHoltWintersModels <- function(tsobject, forecasting_period){
   lst <- list()
-  seasonals <- c("additive", "optimal")
+  seasonals <- c("additive", "multiplicative")
   exponentials <- c(TRUE, FALSE)
   dampeds <- c(TRUE, FALSE)
   xg <- expand.grid(seasonals,dampeds,exponentials)
-  for(i in 1:8){
+  for(i in 1:nrow(xg)){
     k <- paste('hw',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
     tryCatch({
       fit.hw <- hw(tsobject,seasonal=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
@@ -193,53 +182,56 @@ getHoltWintersModels <- function(tsobject, forecasting_period){
     })
     rm(k)
   }
-  rm(i)
-  rm(seasonals)
-  rm(dampeds)
-  rm(exponentials)
-  rm(xg)
+  rm(i,seasonals,dampeds,exponentials,xg)
   return (lst)
 }
 
-getEtsModels <- function(tsobject){
-  lst <- list()
+```
+
+```{r}
+
+getEtsModels <- function(id,tsobject){
   e <- c("A","M","N")
   t <- c("A","M","N")
   s <- c("A","M","N")
   dampeds <- c(TRUE, FALSE)
   xg <- expand.grid(e,t,s,dampeds)
-  for(i in 1:54){
+  model_summ_df = data.frame()
+  ts_id = NA
+  
+  for(i in 1:nrow(xg)){
+
+    fit.ets = data.frame()
     mt <- toString(paste(xg[i,1],xg[i,2],xg[i,3],sep = ""))
     k <- paste('ets',mt,ifelse(xg[i,4],'d',''),sep='')
+    model_df = data.frame()
+    
     tryCatch({
       if(mt == "NNN") {
-        fit.ets <- ets(tsobject, damped = xg[i,4])
-        lst[[k]] <- accuracy(fit.ets)[6]
-        rm(fit.ets)
+        fit.ets <- ets(tsobject, damped = xg[i,4], ic=c("aicc", "aic", "bic"))
+        ts_id = id
+        model_df = data.frame(cbind(ts_id,fit.ets$aic,fit.ets$bic,
+                                   fit.ets$aicc,accuracy(fit.ets)[6],fit.ets$method))
       } else if(xg[i,3] != "N") {
         if(frequency(tsobject) != 1) {
-          fit.ets <- ets(tsobject, model=mt, damped=xg[i,4])
-          lst[[k]] <- accuracy(fit.ets)[6]
-          rm(fit.ets)
+          fit.ets <- ets(tsobject, model=mt, damped=xg[i,4], ic=c("aicc", "aic", "bic"))
+          ts_id = id
+          model_df = data.frame(cbind(ts_id,fit.ets$aic,fit.ets$bic,
+                                   fit.ets$aicc,accuracy(fit.ets)[6],fit.ets$method))
         }
       } else {
-        fit.ets <- ets(tsobject, model=mt, damped=xg[i,4])
-        lst[[k]] <- accuracy(fit.ets)[6]
-        rm(fit.ets)
+        fit.ets <- ets(tsobject, model=mt, damped=xg[i,4], ic=c("aicc", "aic", "bic"))
+        ts_id = id
+        model_df = data.frame(cbind(ts_id,fit.ets$aic,fit.ets$bic,
+                                   fit.ets$aicc,accuracy(fit.ets)[6],fit.ets$method))
       }
     },error=function(e){
       print(paste(k,e,sep=":"))
     })
-    rm(k)
-    rm(mt)
+   model_summ_df = rbind.fill(model_summ_df,model_df)
   }
-  rm(i)
-  rm(e)
-  rm(t)
-  rm(s)
-  rm(dampeds)
-  rm(xg)
-  return (lst)
+  rm(k,mt,fit.ets,i,e,t,s,dampeds,xg)
+  return (model_summ_df)
 }
 
 ```
@@ -247,16 +239,17 @@ getEtsModels <- function(tsobject){
 # function to try all models in time series object
 
 ```{r}
-getAllModelsMase <- function(tsobject, forecasting_period) {
-  maselst <- list()
-  maselst <- append(maselst,getAutoModels(tsobject))
-  maselst <- append(maselst,getSesModels(tsobject, forecasting_period))
-  maselst <- append(maselst,getHoltModels(tsobject, forecasting_period))
-  if(frequency(tsobject) != 1) {
-    maselst <- append(maselst,getHoltWintersModels(tsobject, forecasting_period))
-  }
-  maselst <- append(maselst,getEtsModels(tsobject))
-  return (maselst)
+getAllModelsMase <- function(id,tsobject, forecasting_period) {
+#  maselst <- data.frame()
+#  maselst <- append(maselst,getAutoModels(tsobject))
+#  maselst <- append(maselst,getSesModels(tsobject, forecasting_period))
+#  maselst <- append(maselst,getHoltModels(tsobject, forecasting_period))
+#  if(frequency(tsobject) != 1) {
+#    maselst <- append(maselst,getHoltWintersModels(tsobject, forecasting_period))
+#  }
+#  maselst <- append(maselst,getEtsModels(tsobject))
+#  maselst <- getEtsModels(tsobject)
+  return (getEtsModels(id,tsobject))
 }
 ```
 
@@ -266,6 +259,8 @@ getAllModelsMase <- function(tsobject, forecasting_period) {
 all_objects <- list()
 for(i in c(1,2,3)) {
   df <- read_excel(path="./data/M3C_reduced.xlsx" , sheet=i, trim_ws=TRUE)
+  #sampling to make execution faster - should be deleted later
+  df = df[sample(nrow(df),5),]
   output <- apply(df,1,processDataRow,getFrequency(i),getType(i))
   all_objects <- append(all_objects,output)
   rm(df)
@@ -276,15 +271,58 @@ rm(i)
 
 
 ```{r echo=FALSE, include=FALSE, message=FALSE, warning=FALSE}
-modelsSpecs <- list()
-for(il in 1:length(all_objects)) {
-  element <- all_objects[[il]]
-  print(all_objects[[il]]@id)
-  modelsSpecs[[all_objects[[il]]@id]] <- getAllModelsMase(element@ts_training, element@forecast_period) 
-}
-rm(il)
-rm(element)
+models_data = lapply(all_objects,
+                     function(element){
+                        t = getAllModelsMase(element@id,element@ts_training, 
+                                            element@forecast_period)
+                        return(t)
+                      })
+models_data = as.data.frame(do.call(rbind,models_data))
+models_data = models_data[rowSums(is.na(models_data)) != ncol(models_data),]
+colnames(models_data) = c("TS_ID","AIC","BIC","AICC","MASE","METHOD")
+models_data$AIC = as.numeric(as.character(models_data$AIC))
+models_data$BIC = as.numeric(as.character(models_data$BIC))
+models_data$AICC = as.numeric(as.character(models_data$AICC))
+models_data$MASE = as.numeric(as.character(models_data$MASE))
+
 ```
 
+```{r}
+
+sorted <- models_data %>% 
+          group_by(TS_ID) %>%
+          mutate(my_ranks = order(AICC, AIC,BIC, decreasing=TRUE))
+
+
+```
+
+#Sarun Test Section
+
+```{r}
+  ics <- c("bic", "aicc", "aic")
+  dampeds <- c(TRUE, FALSE)
+  xg <- expand.grid(ics,dampeds)
+
+fit.auto <- ets(all_objects[[1]]@ts_training,model="ZZZ", damped = xg[1,2], ic=toString(xg[1,1])
+                ,opt.crit = "mse"
+                )
+accuracy(fit.auto)
+fit.auto$method
+k = ifelse(xg[1,2],paste(toString(xg[1,1]),"damped", sep='_'),toString(xg[1,1]))
+
+
+  e <- c("A","M","N")
+  t <- c("A","M","N")
+  s <- c("A","M","N")
+  dampeds <- c(TRUE, FALSE)
+  xg <- expand.grid(e,t,s,dampeds)
+  mt <- toString(paste(xg[15,1],xg[15,2],xg[15,3],sep = ""))
+
+fit.auto <- ets(all_objects[[6]]@ts_training,model="AAN", damped = TRUE, ic=c("aicc", "aic", "bic"))
+
+test = data.frame(cbind(fit.auto$aic,fit.auto$bic,fit.auto$aicc,fit.auto$mase,fit.auto$method,fit.auto$series ))
+print(t)
+
+```
 
 
