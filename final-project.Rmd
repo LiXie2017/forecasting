@@ -433,6 +433,8 @@ rm(element)
 #create a data frame for sorting
 ```{r}
 result_df <- data.frame(id=numeric(),
+                        type=character(),
+                        frequency=numeric(),
                         category=character(),
                         key=character(),
                         mase=numeric(),
@@ -444,6 +446,8 @@ result_df <- data.frame(id=numeric(),
                         boxtest.pvalue=numeric(),
                         boxtest.count=numeric())
 names_vec<-c("id",
+                    "type",
+                    "frequency",
                     "category",
                     "modelKey",
                     "mase",
@@ -458,6 +462,8 @@ names(result_df) <- names_vec
 for(il in 1:len) {
   lst <-  modelsSpecs[[all_objects[[il]]@id]]
   df <- data.frame(id=numeric(),
+                   type=character(),
+                   frequency=numeric(),
                    category=character(),
                    key=character(),
                    mase=numeric(),
@@ -471,6 +477,8 @@ for(il in 1:len) {
   names(df)<-names_vec
   for (loop  in 1:length(lst)){
     temp <- data.frame(all_objects[[il]]@id,
+                       all_objects[[il]]@type,
+                       all_objects[[il]]@frequency,
                        all_objects[[il]]@category,
                        lst[[loop]]@key,
                        lst[[loop]]@mase,
@@ -488,6 +496,7 @@ for(il in 1:len) {
   df <- df[with(df, order(mase)), ]
   # Adding data frame for future reporting purpose
   all_objects[[il]]@models_df <- df
+  #Selection logic for best model needs to go here
   result_df <- rbind(result_df,df[1,])
   rm(df)
   rm(lst)
