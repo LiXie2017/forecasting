@@ -39,7 +39,8 @@ setClass(Class="TClass",
            original_data="numeric",
            validation="numeric",
            ts_complete="ts",
-           ts_training="ts"   
+           ts_training="ts",
+           models_df="data.frame"
       )
 )
 
@@ -50,10 +51,35 @@ setClass(Class="RClass",
            aic="numeric",
            bic="numeric", 
            aicc="numeric",
-           swtest="numeric", # check shapiro-wilk test value
+           swtest.pvalue="numeric", # check shapiro-wilk test value
+           swtest.count="numeric",
+           boxtest.pvalue="numeric",
+           boxtest.count="numeric",
            ts_forecast="ts" # forecast time series
          )
 )
+
+checkShapiroWilkResiduals <- function(residuals){
+  sw.test <- shapiro.test(residuals)
+  pval <- sw.test$p.value
+  ct <- 0
+  if(pval < 0.05) {
+    ct <- sum((residuals > 0.05) == TRUE) + sum((residuals < -0.05) == TRUE)
+  }
+  rm(sw.test)
+  return (c(pval,ct))
+}
+
+checkBoxTestResiduals <- function(residuals){
+  box.test <- Box.test(residuals, lag = 1, type = "Ljung-Box", fitdf = 0)
+  pval_box <- box.test$p.value
+  ct_box <- 0
+  if(pval_box < 0.05) {
+    ct_box <- sum((residuals > 0.05) == TRUE) + sum((residuals < -0.05) == TRUE)
+  }
+  rm(box.test)
+  return (c(pval_box,ct_box))
+}
 
 processDataRow <- function(x, series_frequency, type) {
   
@@ -128,15 +154,23 @@ getAutoModels <- function(tsobject, forecasting_period) {
     fit.auto <- ets(tsobject,model="ZZZ", damped = xg[i,2], ic=toString(xg[i,1]))
     k <- ifelse(xg[i,2],paste("ETS_AUTO",toString(xg[i,1]),"damped", sep='_'),paste("ETS_AUTO",toString(xg[i,1]), sep="_"))
     frc.ets <- forecast(fit.auto,h=forecasting_period)
+    vec_sw <- checkShapiroWilkResiduals(fit.auto$residuals)
+    vec_box <- checkBoxTestResiduals(fit.auto$residuals)
     lst[[k]] <- new("RClass",key=k,
               mase=accuracy(fit.auto)[6],
               aic=fit.auto$aic,
               bic=fit.auto$bic,
               aicc=fit.auto$aicc,
+              swtest.pvalue=vec_sw[1],
+              swtest.count=vec_sw[2],
+              boxtest.pvalue=vec_box[1],
+              boxtest.count=vec_box[2],
               ts_forecast=frc.ets$mean)
     rm(frc.ets)
     rm(k)
     rm(fit.auto)
+    rm(vec_sw)
+    rm(vec_box)
   }
   rm(i)
   rm(ics)
@@ -155,14 +189,22 @@ getSesModels <- function(tsobject, forecasting_period) {
     k <- paste('ses',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
     tryCatch({
       fit.ses <- ses(tsobject,initial=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
+      vec_sw <- checkShapiroWilkResiduals(fit.ses$residuals)
+      vec_box <- checkBoxTestResiduals(fit.ses$residuals)
       lst[[k]] <- new("RClass",key=k,
               mase=accuracy(fit.ses)[6],
               aic=ifelse(is.null(fit.ses$model$aic),-1,fit.ses$model$aic),
               bic=ifelse(is.null(fit.ses$model$bic),-1,fit.ses$model$bic),
               aicc=ifelse(is.null(fit.ses$model$aicc),-1,fit.ses$model$aicc),
+              swtest.pvalue=vec_sw[1],
+              swtest.count=vec_sw[2],
+              boxtest.pvalue=vec_box[1],
+              boxtest.count=vec_box[2],
               ts_forecast=fit.ses$mean
               )
       rm(fit.ses)
+      rm(vec_sw)
+      rm(vec_box)
     },error=function(e){
       print(paste(k,e,sep=":"))
     })
@@ -186,13 +228,21 @@ getHoltModels <- function(tsobject, forecasting_period){
     k <- paste('holt',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
     tryCatch({
       fit.holt <- holt(tsobject, initial=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
+      vec_sw <- checkShapiroWilkResiduals(fit.holt$residuals)
+      vec_box <- checkBoxTestResiduals(fit.holt$residuals)
       lst[[k]] <- new("RClass",key=k,
               mase=accuracy(fit.holt)[6],
               aic=ifelse(is.null(fit.holt$model$aic),-1,fit.holt$model$aic),
               bic=ifelse(is.null(fit.holt$model$bic),-1,fit.holt$model$bic),
               aicc=ifelse(is.null(fit.holt$model$aicc),-1,fit.holt$model$aicc),
+              swtest.pvalue=vec_sw[1],
+              swtest.count=vec_sw[2],
+              boxtest.pvalue=vec_box[1],
+              boxtest.count=vec_box[2],
               ts_forecast=fit.holt$mean
               )
+      rm(vec_sw)
+      rm(vec_box)
       rm(fit.holt)
     },error=function(e){
       print(paste(k,e,sep=":"))
@@ -217,13 +267,21 @@ getHoltWintersModels <- function(tsobject, forecasting_period){
     k <- paste('hw',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
     tryCatch({
       fit.hw <- hw(tsobject,seasonal=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
+      vec_sw <- checkShapiroWilkResiduals(fit.hw$residuals)
+      vec_box <- checkBoxTestResiduals(fit.hw$residuals)
       lst[[k]] <- new("RClass",key=k,
               mase=accuracy(fit.hw)[6],
               aic=ifelse(is.null(fit.hw$model$aic),-1,fit.hw$model$aic),
               bic=ifelse(is.null(fit.hw$model$bic),-1,fit.hw$model$bic),
               aicc=ifelse(is.null(fit.hw$model$aicc),-1,fit.hw$model$aicc),
+              swtest.pvalue=vec_sw[1],
+              swtest.count=vec_sw[2],
+              boxtest.pvalue=vec_box[1],
+              boxtest.count=vec_box[2],
               ts_forecast=fit.hw$mean)
       rm(fit.hw)
+      rm(vec_box)
+      rm(vec_sw)
     },error=function(e){
       print(paste(k,e,sep=":"))
     })
@@ -251,38 +309,62 @@ getEtsModels <- function(tsobject, forecasting_period){
       if(mt == "NNN") {
         fit.ets <- ets(tsobject, damped = xg[i,4])
         frc.ets <- forecast(fit.ets,h=forecasting_period)
+        vec_sw <- checkShapiroWilkResiduals(fit.ets$residuals)
+        vec_box <- checkBoxTestResiduals(fit.ets$residuals)
         lst[[k]] <- new("RClass",key=k,
               mase=accuracy(fit.ets)[6],
               aic=fit.ets$aic,
               bic=fit.ets$bic,
               aicc=fit.ets$aicc,
+              swtest.pvalue=vec_sw[1],
+              swtest.count=vec_sw[2],
+              boxtest.pvalue=vec_box[1],
+              boxtest.count=vec_box[2],
               ts_forecast=frc.ets$mean)
         rm(frc.ets)
         rm(fit.ets)
+        rm(vec_sw)
+        rm(vec_box)
       } else if(xg[i,3] != "N") {
         if(frequency(tsobject) != 1) {
           fit.ets <- ets(tsobject, model=mt, damped=xg[i,4])
           frc.ets <- forecast(fit.ets,h=forecasting_period)
+          vec_sw <- checkShapiroWilkResiduals(fit.ets$residuals)
+          vec_box <- checkBoxTestResiduals(fit.ets$residuals)
           lst[[k]] <- new("RClass",key=k,
               mase=accuracy(fit.ets)[6],
               aic=fit.ets$aic,
               bic=fit.ets$bic,
               aicc=fit.ets$aicc,
+              swtest.pvalue=vec_sw[1],
+              swtest.count=vec_sw[2],
+              boxtest.pvalue=vec_box[1],
+              boxtest.count=vec_box[2],
               ts_forecast=frc.ets$mean)
           rm(frc.ets)
           rm(fit.ets)
+          rm(vec_sw)
+          rm(vec_box)
         }
       } else {
         fit.ets <- ets(tsobject, model=mt, damped=xg[i,4])
         frc.ets <- forecast(fit.ets,h=forecasting_period)
+        vec_sw <- checkShapiroWilkResiduals(fit.ets$residuals)
+        vec_box <- checkBoxTestResiduals(fit.ets$residuals)
         lst[[k]] <- new("RClass",key=k,
               mase=accuracy(fit.ets)[6],
               aic=fit.ets$aic,
               bic=fit.ets$bic,
               aicc=fit.ets$aicc,
+              swtest.pvalue=vec_sw[1],
+              swtest.count=vec_sw[2],
+              boxtest.pvalue=vec_box[1],
+              boxtest.count=vec_box[2],
               ts_forecast=frc.ets$mean)
         rm(frc.ets)
         rm(fit.ets)
+        rm(vec_sw)
+        rm(vec_box)
       }
     },error=function(e){
       print(paste(k,e,sep=":"))
@@ -334,7 +416,8 @@ rm(i)
 
 ```{r echo=FALSE, include=FALSE, message=FALSE, warning=FALSE}
 modelsSpecs <- list()
-for(il in 1:length(all_objects)) {
+len <- length(all_objects)
+for(il in 1:len) {
   element <- all_objects[[il]]
   print(all_objects[[il]]@id)
   modelsSpecs[[all_objects[[il]]@id]] <- getAllModelsMase(element@ts_training, element@forecast_period) 
@@ -343,5 +426,69 @@ rm(il)
 rm(element)
 ```
 
-
-
+#create a data frame for sorting
+```{r}
+result_df <- data.frame(id=numeric(),
+                        category=character(),
+                        key=character(),
+                        mase=numeric(),
+                        aic=numeric(),
+                        aicc=numeric(),
+                        bic=numeric(),
+                        swtest.pvalue=numeric(),
+                        swtest.count=numeric(),
+                        boxtest.pvalue=numeric(),
+                        boxtest.count=numeric())
+names_vec<-c("id",
+                    "category",
+                    "modelKey",
+                    "mase",
+                    "aic",
+                    "aicc",
+                    "bic",
+                    "sw.pvalue",
+                    "sw.count",
+                    "box.pvalue",
+                    "box.count")
+names(result_df) <- names_vec
+for(il in 1:len) {
+  lst <-  modelsSpecs[[all_objects[[il]]@id]]
+  df <- data.frame(id=numeric(),
+                   category=character(),
+                   key=character(),
+                   mase=numeric(),
+                   aic=numeric(),
+                   aicc=numeric(),
+                   bic=numeric(),
+                   swtest.pvalue=numeric(),
+                   swtest.count=numeric(),
+                   boxtest.pvalue=numeric(),
+                   boxtest.count=numeric())
+  names(df)<-names_vec
+  for (loop  in 1:length(lst)){
+    temp <- data.frame(all_objects[[il]]@id,
+                       all_objects[[il]]@category,
+                       lst[[loop]]@key,
+                       lst[[loop]]@mase,
+                       lst[[loop]]@aic,
+                       lst[[loop]]@aicc,
+                       lst[[loop]]@bic,
+                       lst[[loop]]@swtest.pvalue,
+                       lst[[loop]]@swtest.count,
+                       lst[[loop]]@boxtest.pvalue,
+                       lst[[loop]]@boxtest.count)
+    names(temp)<-names_vec
+    df <- rbind(df,temp)
+    rm(temp)
+  }
+  df <- df[with(df, order(mase)), ]
+  # Adding data frame for future reporting purpose
+  all_objects[[il]]@models_df <- df
+  result_df <- rbind(result_df,df[1,])
+  rm(df)
+  rm(lst)
+}
+rm(il)
+rm(loop)
+rm(names_vec)
+```
