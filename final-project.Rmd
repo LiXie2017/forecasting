@@ -39,8 +39,8 @@ setClass(Class="TClass",
            original_data="numeric",
            validation="numeric",
            ts_complete="ts",
-           ts_training="ts"
-         )
+           ts_training="ts"   
+      )
 )
 
 setClass(Class="RClass",
@@ -49,7 +49,9 @@ setClass(Class="RClass",
            mase="numeric",
            aic="numeric",
            bic="numeric", 
-           aicc="numeric"
+           aicc="numeric",
+           swtest="numeric", # check shapiro-wilk test value
+           ts_forecast="ts" # forecast time series
          )
 )
 
@@ -117,19 +119,22 @@ getMethodName <- function(m) {
   st <- gsub(",","",st)
 }
 
-getAutoModels <- function(tsobject) {
+getAutoModels <- function(tsobject, forecasting_period) {
   lst <- list()
   ics <- c("bic", "aicc", "aic")
   dampeds <- c(TRUE, FALSE)
   xg <- expand.grid(ics,dampeds)
   for(i in 1:6){
     fit.auto <- ets(tsobject,model="ZZZ", damped = xg[i,2], ic=toString(xg[i,1]))
-    k <- ifelse(xg[i,2],paste(toString(xg[i,1]),"damped", sep='_'),toString(xg[i,1]))
+    k <- ifelse(xg[i,2],paste("ETS_AUTO",toString(xg[i,1]),"damped", sep='_'),paste("ETS_AUTO",toString(xg[i,1]), sep="_"))
+    frc.ets <- forecast(fit.auto,h=forecasting_period)
     lst[[k]] <- new("RClass",key=k,
               mase=accuracy(fit.auto)[6],
               aic=fit.auto$aic,
               bic=fit.auto$bic,
-              aicc=fit.auto$aicc)
+              aicc=fit.auto$aicc,
+              ts_forecast=frc.ets$mean)
+    rm(frc.ets)
     rm(k)
     rm(fit.auto)
   }
@@ -154,7 +159,9 @@ getSesModels <- function(tsobject, forecasting_period) {
               mase=accuracy(fit.ses)[6],
               aic=ifelse(is.null(fit.ses$model$aic),-1,fit.ses$model$aic),
               bic=ifelse(is.null(fit.ses$model$bic),-1,fit.ses$model$bic),
-              aicc=ifelse(is.null(fit.ses$model$aicc),-1,fit.ses$model$aicc))
+              aicc=ifelse(is.null(fit.ses$model$aicc),-1,fit.ses$model$aicc),
+              ts_forecast=fit.ses$mean
+              )
       rm(fit.ses)
     },error=function(e){
       print(paste(k,e,sep=":"))
@@ -183,7 +190,9 @@ getHoltModels <- function(tsobject, forecasting_period){
               mase=accuracy(fit.holt)[6],
               aic=ifelse(is.null(fit.holt$model$aic),-1,fit.holt$model$aic),
               bic=ifelse(is.null(fit.holt$model$bic),-1,fit.holt$model$bic),
-              aicc=ifelse(is.null(fit.holt$model$aicc),-1,fit.holt$model$aicc))
+              aicc=ifelse(is.null(fit.holt$model$aicc),-1,fit.holt$model$aicc),
+              ts_forecast=fit.holt$mean
+              )
       rm(fit.holt)
     },error=function(e){
       print(paste(k,e,sep=":"))
@@ -212,7 +221,8 @@ getHoltWintersModels <- function(tsobject, forecasting_period){
               mase=accuracy(fit.hw)[6],
               aic=ifelse(is.null(fit.hw$model$aic),-1,fit.hw$model$aic),
               bic=ifelse(is.null(fit.hw$model$bic),-1,fit.hw$model$bic),
-              aicc=ifelse(is.null(fit.hw$model$aicc),-1,fit.hw$model$aicc))
+              aicc=ifelse(is.null(fit.hw$model$aicc),-1,fit.hw$model$aicc),
+              ts_forecast=fit.hw$mean)
       rm(fit.hw)
     },error=function(e){
       print(paste(k,e,sep=":"))
@@ -227,7 +237,7 @@ getHoltWintersModels <- function(tsobject, forecasting_period){
   return (lst)
 }
 
-getEtsModels <- function(tsobject){
+getEtsModels <- function(tsobject, forecasting_period){
   lst <- list()
   e <- c("A","M","N")
   t <- c("A","M","N")
@@ -236,33 +246,42 @@ getEtsModels <- function(tsobject){
   xg <- expand.grid(e,t,s,dampeds)
   for(i in 1:54){
     mt <- toString(paste(xg[i,1],xg[i,2],xg[i,3],sep = ""))
-    k <- paste('ets',mt,ifelse(xg[i,4],'d',''),sep='')
+    k <- paste('ETS(',mt,ifelse(xg[i,4],'d',''),')',sep='')
     tryCatch({
       if(mt == "NNN") {
         fit.ets <- ets(tsobject, damped = xg[i,4])
+        frc.ets <- forecast(fit.ets,h=forecasting_period)
         lst[[k]] <- new("RClass",key=k,
               mase=accuracy(fit.ets)[6],
               aic=fit.ets$aic,
               bic=fit.ets$bic,
-              aicc=fit.ets$aicc)
+              aicc=fit.ets$aicc,
+              ts_forecast=frc.ets$mean)
+        rm(frc.ets)
         rm(fit.ets)
       } else if(xg[i,3] != "N") {
         if(frequency(tsobject) != 1) {
           fit.ets <- ets(tsobject, model=mt, damped=xg[i,4])
+          frc.ets <- forecast(fit.ets,h=forecasting_period)
           lst[[k]] <- new("RClass",key=k,
               mase=accuracy(fit.ets)[6],
               aic=fit.ets$aic,
               bic=fit.ets$bic,
-              aicc=fit.ets$aicc)
+              aicc=fit.ets$aicc,
+              ts_forecast=frc.ets$mean)
+          rm(frc.ets)
           rm(fit.ets)
         }
       } else {
         fit.ets <- ets(tsobject, model=mt, damped=xg[i,4])
+        frc.ets <- forecast(fit.ets,h=forecasting_period)
         lst[[k]] <- new("RClass",key=k,
               mase=accuracy(fit.ets)[6],
               aic=fit.ets$aic,
               bic=fit.ets$bic,
-              aicc=fit.ets$aicc)
+              aicc=fit.ets$aicc,
+              ts_forecast=frc.ets$mean)
+        rm(frc.ets)
         rm(fit.ets)
       }
     },error=function(e){
@@ -287,13 +306,13 @@ getEtsModels <- function(tsobject){
 ```{r}
 getAllModelsMase <- function(tsobject, forecasting_period) {
   maselst <- list()
-  maselst <- append(maselst,getAutoModels(tsobject))
+  maselst <- append(maselst,getAutoModels(tsobject, forecasting_period))
   maselst <- append(maselst,getSesModels(tsobject, forecasting_period))
   maselst <- append(maselst,getHoltModels(tsobject, forecasting_period))
   if(frequency(tsobject) != 1) {
     maselst <- append(maselst,getHoltWintersModels(tsobject, forecasting_period))
   }
-  maselst <- append(maselst,getEtsModels(tsobject))
+  maselst <- append(maselst,getEtsModels(tsobject, forecasting_period))
   return (maselst)
 }
 ```
