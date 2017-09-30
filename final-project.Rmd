@@ -225,29 +225,31 @@ getHoltModels <- function(tsobject, forecasting_period){
   dampeds <- c(TRUE, FALSE)
   xg <- expand.grid(initials,dampeds,exponentials)
   for(i in 1:8){
-    k <- paste('holt',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
-    tryCatch({
-      fit.holt <- holt(tsobject, initial=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
-      vec_sw <- checkShapiroWilkResiduals(fit.holt$residuals)
-      vec_box <- checkBoxTestResiduals(fit.holt$residuals)
-      lst[[k]] <- new("RClass",key=k,
-              mase=accuracy(fit.holt)[6],
-              aic=ifelse(is.null(fit.holt$model$aic),-1,fit.holt$model$aic),
-              bic=ifelse(is.null(fit.holt$model$bic),-1,fit.holt$model$bic),
-              aicc=ifelse(is.null(fit.holt$model$aicc),-1,fit.holt$model$aicc),
-              swtest.pvalue=vec_sw[1],
-              swtest.count=vec_sw[2],
-              boxtest.pvalue=vec_box[1],
-              boxtest.count=vec_box[2],
-              ts_forecast=fit.holt$mean
-              )
-      rm(vec_sw)
-      rm(vec_box)
-      rm(fit.holt)
-    },error=function(e){
-      print(paste(k,e,sep=":"))
-    })
-    rm(k)
+    if((xg[i,1] == "simple" && xg[i,2]==FALSE) || (xg[i,1] == "optimal")) {
+      k <- paste('holt',toString(xg[i,1]),ifelse(xg[i,2],'d',''),ifelse(xg[i,3],'x',''),sep='')
+      tryCatch({
+        fit.holt <- holt(tsobject, initial=toString(xg[i,1]), damped=xg[i,2], exponential=xg[i,3], h=forecasting_period)
+        vec_sw <- checkShapiroWilkResiduals(fit.holt$residuals)
+        vec_box <- checkBoxTestResiduals(fit.holt$residuals)
+        lst[[k]] <- new("RClass",key=k,
+                mase=accuracy(fit.holt)[6],
+                aic=ifelse(is.null(fit.holt$model$aic),-1,fit.holt$model$aic),
+                bic=ifelse(is.null(fit.holt$model$bic),-1,fit.holt$model$bic),
+                aicc=ifelse(is.null(fit.holt$model$aicc),-1,fit.holt$model$aicc),
+                swtest.pvalue=vec_sw[1],
+                swtest.count=vec_sw[2],
+                boxtest.pvalue=vec_box[1],
+                boxtest.count=vec_box[2],
+                ts_forecast=fit.holt$mean
+                )
+        rm(vec_sw)
+        rm(vec_box)
+        rm(fit.holt)
+      },error=function(e){
+        print(paste(k,e,sep=":"))
+      })
+      rm(k)
+    }
   }
   rm(i)
   rm(initials)
@@ -325,46 +327,48 @@ getEtsModels <- function(tsobject, forecasting_period){
         rm(fit.ets)
         rm(vec_sw)
         rm(vec_box)
-      } else if(xg[i,3] != "N") {
-        if(frequency(tsobject) != 1) {
+      } else if(xg[i,1] != "N") {
+        if(xg[i,3] != "N") {
+          if(frequency(tsobject) != 1) {
+            fit.ets <- ets(tsobject, model=mt, damped=xg[i,4])
+            frc.ets <- forecast(fit.ets,h=forecasting_period)
+            vec_sw <- checkShapiroWilkResiduals(fit.ets$residuals)
+            vec_box <- checkBoxTestResiduals(fit.ets$residuals)
+            lst[[k]] <- new("RClass",key=k,
+                mase=accuracy(fit.ets)[6],
+                aic=fit.ets$aic,
+                bic=fit.ets$bic,
+                aicc=fit.ets$aicc,
+                swtest.pvalue=vec_sw[1],
+                swtest.count=vec_sw[2],
+                boxtest.pvalue=vec_box[1],
+                boxtest.count=vec_box[2],
+                ts_forecast=frc.ets$mean)
+            rm(frc.ets)
+            rm(fit.ets)
+            rm(vec_sw)
+            rm(vec_box)
+          }
+        } else {
           fit.ets <- ets(tsobject, model=mt, damped=xg[i,4])
           frc.ets <- forecast(fit.ets,h=forecasting_period)
           vec_sw <- checkShapiroWilkResiduals(fit.ets$residuals)
           vec_box <- checkBoxTestResiduals(fit.ets$residuals)
           lst[[k]] <- new("RClass",key=k,
-              mase=accuracy(fit.ets)[6],
-              aic=fit.ets$aic,
-              bic=fit.ets$bic,
-              aicc=fit.ets$aicc,
-              swtest.pvalue=vec_sw[1],
-              swtest.count=vec_sw[2],
-              boxtest.pvalue=vec_box[1],
-              boxtest.count=vec_box[2],
-              ts_forecast=frc.ets$mean)
+                mase=accuracy(fit.ets)[6],
+                aic=fit.ets$aic,
+                bic=fit.ets$bic,
+                aicc=fit.ets$aicc,
+                swtest.pvalue=vec_sw[1],
+                swtest.count=vec_sw[2],
+                boxtest.pvalue=vec_box[1],
+                boxtest.count=vec_box[2],
+                ts_forecast=frc.ets$mean)
           rm(frc.ets)
           rm(fit.ets)
           rm(vec_sw)
           rm(vec_box)
         }
-      } else {
-        fit.ets <- ets(tsobject, model=mt, damped=xg[i,4])
-        frc.ets <- forecast(fit.ets,h=forecasting_period)
-        vec_sw <- checkShapiroWilkResiduals(fit.ets$residuals)
-        vec_box <- checkBoxTestResiduals(fit.ets$residuals)
-        lst[[k]] <- new("RClass",key=k,
-              mase=accuracy(fit.ets)[6],
-              aic=fit.ets$aic,
-              bic=fit.ets$bic,
-              aicc=fit.ets$aicc,
-              swtest.pvalue=vec_sw[1],
-              swtest.count=vec_sw[2],
-              boxtest.pvalue=vec_box[1],
-              boxtest.count=vec_box[2],
-              ts_forecast=frc.ets$mean)
-        rm(frc.ets)
-        rm(fit.ets)
-        rm(vec_sw)
-        rm(vec_box)
       }
     },error=function(e){
       print(paste(k,e,sep=":"))
@@ -414,7 +418,7 @@ rm(i)
 ```
 
 
-```{r echo=FALSE, include=FALSE, message=FALSE, warning=FALSE}
+```{r echo=TRUE, include=FALSE, message=FALSE, warning=FALSE}
 modelsSpecs <- list()
 len <- length(all_objects)
 for(il in 1:len) {
