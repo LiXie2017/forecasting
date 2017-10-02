@@ -59,6 +59,23 @@ setClass(Class="RClass",
          )
 )
 
+calculateMASE <- function(validationSet,forecastSet){
+  nlen = length(validationSet)
+  error.terms = validationSet - forecastSet
+  esum = 0 
+  for (i in 2:nlen){
+    esum = esum + abs(forecastSet[i] - forecastSet[i-1] )
+  }
+  if (esum == 0) {
+    esum = 0.0001 # code to avoid division by zero error
+  }
+  q.t = error.terms / (esum/(nlen-1))
+  rm(nlen)
+  rm(esum)
+  rm(error.terms)
+  return (mean(abs(q.t)))
+}
+
 checkShapiroWilkResiduals <- function(residuals){
   sw.test <- shapiro.test(residuals)
   pval <- sw.test$p.value
@@ -444,7 +461,8 @@ result_df <- data.frame(id=numeric(),
                         swtest.pvalue=numeric(),
                         swtest.count=numeric(),
                         boxtest.pvalue=numeric(),
-                        boxtest.count=numeric())
+                        boxtest.count=numeric(),
+                        forecase.mase=numeric())
 names_vec<-c("id",
                     "type",
                     "frequency",
@@ -457,7 +475,8 @@ names_vec<-c("id",
                     "sw.pvalue",
                     "sw.count",
                     "box.pvalue",
-                    "box.count")
+                    "box.count",
+                    "forecase.mase")
 names(result_df) <- names_vec
 for(il in 1:len) {
   lst <-  modelsSpecs[[all_objects[[il]]@id]]
@@ -473,9 +492,12 @@ for(il in 1:len) {
                    swtest.pvalue=numeric(),
                    swtest.count=numeric(),
                    boxtest.pvalue=numeric(),
-                   boxtest.count=numeric())
+                   boxtest.count=numeric(),
+                   forecase.mase=numeric())
   names(df)<-names_vec
   for (loop  in 1:length(lst)){
+    vc <- as.vector(lst[[loop]]@ts_forecast)
+    vc <- vc[1:length(all_objects[[il]]@validation)]
     temp <- data.frame(all_objects[[il]]@id,
                        all_objects[[il]]@type,
                        all_objects[[il]]@frequency,
@@ -488,10 +510,12 @@ for(il in 1:len) {
                        lst[[loop]]@swtest.pvalue,
                        lst[[loop]]@swtest.count,
                        lst[[loop]]@boxtest.pvalue,
-                       lst[[loop]]@boxtest.count)
+                       lst[[loop]]@boxtest.count,
+                       calculateMASE(all_objects[[il]]@validation,vc))
     names(temp)<-names_vec
     df <- rbind(df,temp)
     rm(temp)
+    rm(vc)
   }
   df <- df[with(df, order(mase)), ]
   # Adding data frame for future reporting purpose
@@ -505,3 +529,4 @@ rm(il)
 rm(loop)
 rm(names_vec)
 ```
+
